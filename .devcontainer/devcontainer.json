@@ -32,10 +32,10 @@
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [3306],
+	//"forwardPorts": [3306],
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "go version",
+	// Use '' to run commands after the container is created.
+	"postCreateCommand": "go get -u gorm.io/gorm && go get -u gorm.io/driver/mysql && go get -u github.com/sirupsen/logrus && go get -u github.com/gorilla/mux",
 
 	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
 	//"remoteUser": "vscode"

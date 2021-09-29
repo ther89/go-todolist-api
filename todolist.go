@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var dsn = "root:root@tcp(go-docker-dev-todolist_devcontainer_mysql_1:3306)/todolist?charset=utf8mb4&parseTime=True&loc=Local"
+var dsn = "root:root@tcp(go-todolist-api_devcontainer_mysql_1:3306)/todolist?charset=utf8mb4&parseTime=True&loc=Local"
 var db, _ = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
 type TodoItemModel struct {
@@ -57,9 +57,9 @@ func CreateItem(w http.ResponseWriter, r *http.Request) {
 	description := r.FormValue("description")
 	log.WithFields(log.Fields{"description": description}).Info("Add new TodoItem. Saving to database.")
 	db.Create(&todo)
-	result := db.Last(&todo)
+	db.Last(&todo)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	json.NewEncoder(w).Encode(todo)
 }
 
 func UpdateItem(w http.ResponseWriter, r *http.Request) {
