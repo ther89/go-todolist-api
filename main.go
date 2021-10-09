@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -18,120 +17,146 @@ import (
 var dsn = "root:root@tcp(go-todolist-api_devcontainer_mysql_1:3306)/todolist?charset=utf8mb4&parseTime=True&loc=Local"
 var db, _ = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
-func Heartbeat(w http.ResponseWriter, r *http.Request) {
-	log.Info("API Health is OK")
-	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, `{ "alive": true }`)
-}
-
 func init() {
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetReportCaller(true)
 }
 
 func main() {
-	db.Debug().AutoMigrate(&models.TodoModel{})
+	db.Debug().AutoMigrate(&models.Todo{})
 
 	log.Info("Starting Todolist API server")
 	router := mux.NewRouter()
 	router.HandleFunc("/heartbeat", Heartbeat).Methods("GET")
-	router.HandleFunc("/todo-complete", GetCompletedItems).Methods("GET")
-	router.HandleFunc("/todo-incomplete", GetIncompleteItems).Methods("GET")
-	router.HandleFunc("/todo", GetItems).Methods("GET")
-	router.HandleFunc("/todo", CreateItem).Methods("POST")
-	router.HandleFunc("/todo/{id}", UpdateItem).Methods("POST")
-	router.HandleFunc("/todo/{id}", DeleteItem).Methods("DELETE")
+	router.HandleFunc("/todo-complete", GetCompleted).Methods("GET")
+	router.HandleFunc("/todo-incomplete", GetIncomplete).Methods("GET")
+	router.HandleFunc("/todo", Get).Methods("GET")
+	router.HandleFunc("/todo", Create).Methods("POST")
+	router.HandleFunc("/todo/{id}", Update).Methods("POST", "PUT")
+	router.HandleFunc("/todo/{id}", Delete).Methods("DELETE")
 
 	handler := cors.New(cors.Options{
-		AllowedMethods: []string{"GET", "POST", "DELETE", "PATCH", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "PATCH", "OPTIONS", "PUT"},
 	}).Handler(router)
 
-	http.ListenAndServe(":3000", handler)
+	http.ListenAndServe(":3010", handler)
 }
 
-func CreateItem(w http.ResponseWriter, r *http.Request) {
-	todo := models.TodoModel{Description: "", Completed: false}
-	err := json.NewDecoder(r.Body).Decode(&todo)
+func Heartbeat(w http.ResponseWriter, r *http.Request) {
+	log.Info("Heartbeat called")
+	w.Header().Set("Content-Type", "application/json")
+	response := models.Response{
+		Success: true,
+		Payload: "Service is up.",
+		Error:   "",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func Create(w http.ResponseWriter, r *http.Request) {
+	request := models.CreateRequest{}
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	description := r.FormValue("description")
-	log.WithFields(log.Fields{"description": description}).Info("Add new TodoItem. Saving to database.")
+	log.WithFields(log.Fields{"description": request.Description}).Info("Add new Todo. Saving to database.")
+	todo := models.Todo{}
+	todo.Description = request.Description
 	db.Create(&todo)
 	db.Last(&todo)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(todo)
+	response := models.Response{
+		Success: true,
+		Payload: strconv.Itoa(todo.Id),
+		Error:   "",
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
-func UpdateItem(w http.ResponseWriter, r *http.Request) {
+func Update(w http.ResponseWriter, r *http.Request) {
 	// Get URL parameter from mux
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 
+	request := models.UpdateRequest{}
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Test if the TodoItem exist in DB
-	todo := &models.TodoModel{}
+	todo := &models.Todo{}
+	response := models.Response{}
 	result := db.First(&todo, id)
 	if result.Error != nil {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"updated": false, "error": "Record Not Found"}`)
+		response.Error = result.Error.Error()
+		response.Success = false
+		json.NewEncoder(w).Encode(response)
 	} else {
-		completed, _ := strconv.ParseBool(r.FormValue("completed"))
-		log.WithFields(log.Fields{"Id": id, "Completed": completed}).Info("Updating TodoItem")
+		log.WithFields(log.Fields{"Id": id, "Completed": request.IsCompleted}).Info("Updating Todo")
 		db.First(&todo, id)
-		todo.Completed = completed
+		todo.Completed = request.IsCompleted
 		db.Save(&todo)
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"updated": true}`)
+		response.Success = true
+		response.Payload = "Update successful"
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
-func DeleteItem(w http.ResponseWriter, r *http.Request) {
+func Delete(w http.ResponseWriter, r *http.Request) {
 	// Get URL parameter from mux
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 
 	// Test if the TodoItem exist in DB
-	todo := &models.TodoModel{}
+	todo := models.Todo{}
+	response := models.Response{}
 	result := db.First(&todo, id)
-
 	if result.Error != nil {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"deleted": false, "error": "Record Not Found"}`)
+		response.Error = result.Error.Error()
+		response.Success = false
+		json.NewEncoder(w).Encode(response)
 	} else {
-		log.WithFields(log.Fields{"Id": id}).Info("Deleting TodoItem")
+		log.WithFields(log.Fields{"Id": id}).Info("Deleting Todo")
 		db.First(&todo, id)
 		db.Delete(&todo)
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"deleted": true}`)
+		response.Success = true
+		response.Payload = "Delete successful"
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
-func GetCompletedItems(w http.ResponseWriter, r *http.Request) {
+func GetCompleted(w http.ResponseWriter, r *http.Request) {
 	log.Info("Get completed TodoItems")
 	completedTodoItems := GetTodoItems(true)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(completedTodoItems)
 }
 
-func GetIncompleteItems(w http.ResponseWriter, r *http.Request) {
+func GetIncomplete(w http.ResponseWriter, r *http.Request) {
 	log.Info("Get Incomplete TodoItems")
 	incompleteTodoItems := GetTodoItems(false)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(incompleteTodoItems)
 }
 
-func GetItems(w http.ResponseWriter, r *http.Request) {
+func Get(w http.ResponseWriter, r *http.Request) {
 	log.Info("Get All TodoItems")
-	var todos []models.TodoModel
+	var todos []models.Todo
 	db.Find(&todos)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(todos)
+	json.NewEncoder(w).Encode(&todos)
 }
 
 //Good example how gorm works
 func GetTodoItems(completed bool) interface{} {
-	var todos []models.TodoModel
+	var todos []models.Todo
 	db.Where("completed = ?", completed).Find(&todos)
 	return todos
 }

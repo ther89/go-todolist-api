@@ -9,9 +9,9 @@ services:
           VARIANT: 1.17
           NODE_VERSION: none
       environment:
-        PORT: 3000
+        PORT: 3010
       ports:
-        - 3000:3000
+        - 3010:3010
       volumes:
         - ..:/workspace
       user: vscode
