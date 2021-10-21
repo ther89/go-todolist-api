@@ -1,17 +1,6 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.194.0/containers/go
+// For format details, see https://aka.ms/devcontainer.json.
 {
 	"name": "Go",
-	// "build": {
-	// 	"dockerfile": "Dockerfile",
-	// 	"args": {
-	// 		// Update the VARIANT arg to pick a version of Go: 1, 1.16, 1.17
-	// 		"VARIANT": "1.17",
-	// 		// Options
-	// 		"NODE_VERSION": "none"
-	// 	}
-	// },
-	//"runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
 
 	"dockerComposeFile": "docker-compose.yml",
     "service": "app",
@@ -28,17 +17,13 @@
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
 		"golang.Go",
-		//"ms-azuretools.vscode-docker"
 	],
 
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	//"forwardPorts": [3306],
-
-	// Use '' to run commands after the container is created.
-	"postCreateCommand": "go get -u gorm.io/gorm && go get -u gorm.io/driver/mysql && go get -u github.com/sirupsen/logrus && go get -u github.com/gorilla/mux",
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "chmod +x ./.devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh",
 
 	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	//"remoteUser": "vscode"
+	//"remoteUser": "vscode",
 
 	"shutdownAction": "stopCompose"
 }
